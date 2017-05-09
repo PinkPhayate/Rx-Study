@@ -1,0 +1,105 @@
+# RxSwift周りの勉強
+
+## 大前提
+**Rxcocoaが必要**
+
+```
+import RxSwift
+import RxCocoa
+```
+
+監視するクラス
+onCompleted, onNext, onError を通知する
+
++ 監視する側
+イベントの購読(subscribe)を行う
+subscribe以下に、イベントが起こった時の処置をかく
+```
+let disposable = hoge.event.subscribe(
+	  onNext: { value in
+	  guard let `self` = self else { return }	// 　これをつけなければいけないらしい
+		    // 通常イベント発生時の処理
+	  },
+	  onError: { error in
+		    // エラー発生時の処理
+	  },
+	  onCompleted: {
+		    // 完了時の処理
+	  }
+).addDisposableTo(disposeBag)	// disposeBagはクラス変数で定義する
+```
+
++ PublishSubject
+イベントを発生させる(監視されるクラス)
+
+```例
+class Hoge {
+  private let eventSubject = PublishSubject<Int>()
+
+  var event: Observable<Int> { return eventSubject }
+
+  func doSomething() {
+    // 略
+    eventSubject.onNext(1)  // イベント発行
+  }
+}
+```
+この例ではPublishSubjectでイベントを発生させて(onNext)、event: Observable<Int>でそのイベントの発生を監視する
+
++ BehaviorSubject
+初期値を持った、イベントを発生させる(監視されるクラス)
+
+### オブジェクト(labelとかViewとか)にイベント処理を加える
+
+```
+        let tapGesture = UITapGestureRecognizer()
+        tapGesture.rx.event.subscribe(onNext: { [weak self] gesture in
+            guard let `self` = self else { return }
+            // 処理内容
+        }).addDisposableTo(disposeBagTapped)
+        self.addGestureRecognizer(tapGesture)
+
+```
+
+**事例1**: タップジェスチャーを監視
+
+```swift:事例1.swift
+    tapGesture.rx.event.subscribe(
+        onNext: { [weak self] gesture in
+          guard let `self` = self else { return }
+            //what to do
+        }).addDisposableTo(disposeBag)
+```
+
+**事例2** UIパーツの詳細を監視
+
+```
+// 1. textFieldの文字の変化を観察対象とする
+let nameObservable: Observable<String?> = inputTextField.rx.text.asObservable()
+
+//  これを変数に渡すこともできるけど渡す必要がない時はこのように、subscriptionをかきはじめちゃっておk
+nameObservable.subscribe(
+	onNext: {value in
+    guard self != nil else { return }
+
+    //do something
+    if  value != nil {
+    self.statusLabel.text = value!
+    }
+
+    print(value)
+}).addDisposableTo(disposeBag)
+
+
+
+// UIButtonのタップイベントを扱う時はこんな感じ
+let tapEvent: Observable = self.goButton.rx.tap.asObservable()
+tapEvent.subscribe(
+    onNext: { _ in
+// do something
+        self.goNext()
+}).addDisposableTo(self.disposeBag)
+
+```
+
+
